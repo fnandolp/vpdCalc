@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de VPD para Cultivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inclui a biblioteca Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Inclui a biblioteca Chart.js date-adapter para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Inclui a biblioteca PapaParse para analisar CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0e0e1a;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 420px;
+        }
+        .gradient-bg {
+            background-image: linear-gradient(to bottom right, #2c412f, #1a2a1a);
+        }
+        .input-field {
+            background-color: #1a1a2e;
+            color: #f0f0f0;
+            border: 1px solid #3a3a5a;
+        }
+        .btn {
+            background-image: linear-gradient(to right, #4ade80, #34d399);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .vpd-table th, .vpd-table td {
+            text-align: center;
+            padding: 8px;
+            border: 1px solid #2d3436;
+            transition: background-color 0.3s ease-in-out;
+        }
+        .vpd-table th {
+            background-color: #1a1a2e;
+            color: #f0f0f0;
+        }
+        .vpd-table td.muda {
+            background-color: #3b0000;
+        }
+        .vpd-table td.vege {
+            background-color: #0d3b00;
+        }
+        .vpd-table td.flora {
+            background-color: #3d3d00;
+        }
+        .vpd-table td.out-of-range {
+            background-color: #1f1f1f;
+        }
+        .vpd-table td.highlight {
+            border: 3px solid #6ee7b7;
+            box-shadow: 0 0 15px #6ee7b7;
+            transform: scale(1.05);
+            position: relative;
+            z-index: 10;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #6ee7b7;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center justify-center min-h-screen">
+
+    <div class="container mx-auto p-6 rounded-3xl shadow-2xl gradient-bg border border-green-700">
+        <h1 class="text-3xl font-bold text-center mb-4 text-white">Calculadora de VPD</h1>
+        <p class="text-center mb-6 text-gray-300">Calcule o VPD para otimizar o ambiente do seu cultivo.</p>
+
+        <!-- Seção de Inputs -->
+        <div class="space-y-4 mb-8">
+            <div>
+                <label for="temperature" class="block text-sm font-medium mb-1 text-gray-300">Temperatura do Ar (°C)</label>
+                <input type="number" id="temperature" placeholder="Ex: 25" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+            </div>
+            <div>
+                <label for="humidity" class="block text-sm font-medium mb-1 text-gray-300">Umidade Relativa (%)</label>
+                <input type="number" id="humidity" placeholder="Ex: 60" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+            </div>
+            <div>
+                <label for="temp-offset" class="block text-sm font-medium mb-1 text-gray-300">Diferença de Temperatura da Folha (°C)</label>
+                <input type="number" id="temp-offset" placeholder="Ex: -2.5" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+            </div>
+        </div>
+
+        <!-- Botão de Calcular -->
+        <button id="calculateBtn" class="w-full p-3 text-lg font-semibold rounded-lg text-gray-900 shadow-md btn transition-all duration-300 ease-in-out">
+            Calcular VPD
+        </button>
+
+        <!-- Seção de Resultados -->
+        <div id="result-container" class="mt-8 p-5 rounded-xl border border-green-600 bg-green-900 bg-opacity-20 text-center hidden">
+            <h2 class="text-xl font-bold text-white mb-2">Seu VPD é:</h2>
+            <p id="vpd-value" class="text-5xl font-extrabold text-green-400 tracking-wide"></p>
+            <p id="vpd-stage" class="text-sm mt-3 text-gray-300"></p>
+        </div>
+
+        <!-- Mensagem de erro -->
+        <div id="error-message" class="mt-4 p-4 rounded-lg bg-red-900 bg-opacity-20 text-red-300 border border-red-700 hidden">
+            Por favor, insira valores válidos de temperatura e umidade.
+        </div>
+    </div>
+    
+    <!-- Tabela de VPD -->
+    <div class="container mx-auto mt-8 p-6 rounded-3xl shadow-2xl bg-gray-900 border border-gray-700">
+        <h2 class="text-2xl font-bold text-center mb-4 text-white">Tabela de VPD Ideal</h2>
+        <div class="overflow-x-auto relative rounded-lg">
+            <table class="w-full vpd-table">
+                <thead>
+                    <tr>
+                        <th class="px-2 py-2">Temp (°C)</th>
+                        <th class="px-2 py-2">50%</th>
+                        <th class="px-2 py-2">55%</th>
+                        <th class="px-2 py-2">60%</th>
+                        <th class="px-2 py-2">65%</th>
+                        <th class="px-2 py-2">70%</th>
+                        <th class="px-2 py-2">75%</th>
+                        <th class="px-2 py-2">80%</th>
+                    </tr>
+                </thead>
+                <tbody id="vpd-table-body">
+                    <!-- Tabela gerada dinamicamente pelo JS -->
+                </tbody>
+            </table>
+        </div>
+        <div class="flex flex-col md:flex-row justify-center space-y-2 md:space-y-0 md:space-x-4 mt-6 text-sm">
+            <div class="legend-item"><span class="w-4 h-4 rounded-full bg-red-900 border border-red-700 mr-2"></span><p>Fase de Muda / Começo do Vegetativo</p></div>
+            <div class="legend-item"><span class="w-4 h-4 rounded-full bg-green-900 border border-green-700 mr-2"></span><p>Final do Vegetativo / Começo da Floração</p></div>
+            <div class="legend-item"><span class="w-4 h-4 rounded-full bg-yellow-900 border border-yellow-700 mr-2"></span><p>Meio e Final da Floração</p></div>
+        </div>
+    </div>
+
+    <!-- Seção de Upload de Dados do Sensor e Gráfico -->
+    <div class="container mx-auto mt-8 p-6 rounded-3xl shadow-2xl bg-gray-900 border border-gray-700">
+        <h2 class="text-2xl font-bold text-center mb-4 text-white">Análise de Dados do Sensor</h2>
+        <p class="text-sm text-gray-400 text-center mb-4">Carregue os arquivos CSV com os dados do seu sensor para visualizar a evolução do VPD ao longo do tempo.</p>
+        
+        <div class="mb-4">
+            <label for="combined-file" class="block text-sm font-medium mb-1 text-gray-300">Opção 1: Arquivo CSV Combinado</label>
+            <input type="file" id="combined-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border border-gray-700">
+        </div>
+        
+        <p class="text-center text-gray-400 mb-4">OU</p>
+        
+        <div class="mb-4">
+            <label for="temp-file" class="block text-sm font-medium mb-1 text-gray-300">Opção 2: Arquivo de Temperatura</label>
+            <input type="file" id="temp-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border border-gray-700">
+        </div>
+        
+        <div class="mb-4">
+            <label for="humidity-file" class="block text-sm font-medium mb-1 text-gray-300">Arquivo de Umidade</label>
+            <input type="file" id="humidity-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border a.700">
+        </div>
+
+        <button id="processFilesBtn" class="w-full p-3 text-lg font-semibold rounded-lg text-gray-900 shadow-md btn transition-all duration-300 ease-in-out">
+            Processar e Gerar Gráfico
+        </button>
+
+        <div id="chart-container" class="relative mt-4" style="height: 400px;">
+            <canvas id="vpd-chart"></canvas>
+            <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 rounded-lg hidden">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Nova legenda para as faixas de VPD -->
+        <div id="vpd-legend" class="flex flex-wrap justify-center space-x-4 mt-6 text-sm">
+            <div class="flex items-center space-x-2 my-1">
+                <div class="w-4 h-4 rounded-full bg-red-900 border border-red-700"></div>
+                <span>Perigo (0 - 0.41 kPa)</span>
+            </div>
+            <div class="flex items-center space-x-2 my-1">
+                <div class="w-4 h-4 rounded-full bg-red-500 border border-red-700"></div>
+                <span>Muda / Vegetativo (0.42 - 0.73 kPa)</span>
+            </div>
+            <div class="flex items-center space-x-2 my-1">
+                <div class="w-4 h-4 rounded-full bg-green-500 border border-green-700"></div>
+                <span>Vegetativo / Floração (0.64 - 1.06 kPa)</span>
+            </div>
+            <div class="flex items-center space-x-2 my-1">
+                <div class="w-4 h-4 rounded-full bg-yellow-500 border border-yellow-700"></div>
+                <span>Meio / Final Floração (0.95 - 1.37 kPa)</span>
+            </div>
+            <div class="flex items-center space-x-2 my-1">
+                <div class="w-4 h-4 rounded-full bg-red-900 border border-red-700"></div>
+                <span>Perigo (> 1.38 kPa)</span>
+            </div>
+        </div>
+
+        <p id="chart-error" class="mt-4 text-center text-red-400 hidden"></p>
+    </div>
+
+    <script>
+        const calculateBtn = document.getElementById('calculateBtn');
+        const tempInput = document.getElementById('temperature');
+        const humidityInput = document.getElementById('humidity');
+        const tempOffsetInput = document.getElementById('temp-offset');
+        const vpdValue = document.getElementById('vpd-value');
+        const vpdStage = document.getElementById('vpd-stage');
+        const resultContainer = document.getElementById('result-container');
+        const errorMsg = document.getElementById('error-message');
+        const vpdTableBody = document.getElementById('vpd-table-body');
+        const tempFile = document.getElementById('temp-file');
+        const humidityFile = document.getElementById('humidity-file');
+        const combinedFile = document.getElementById('combined-file');
+        const processFilesBtn = document.getElementById('processFilesBtn');
+        const chartError = document.getElementById('chart-error');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        const tempValues = [20, 22, 24, 26, 28, 30, 32];
+        const humidityValues = [50, 55, 60, 65, 70, 75, 80];
+
+        let vpdChart = null;
+        
+        // Novo plugin para desenhar as faixas de VPD
+        const vpdRangesPlugin = {
+            id: 'vpdRangesPlugin',
+            beforeDraw: (chart) => {
+                const { ctx, chartArea: { top, bottom, left, right, width }, scales: { y1 } } = chart;
+                if (!y1) return;
+                ctx.save();
+                
+                // Faixa de Perigo (0 a 0.41)
+                const yStartPerigo = y1.getPixelForValue(0.41);
+                const yEndPerigo = y1.getPixelForValue(0);
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                ctx.fillRect(left, yStartPerigo, width, yEndPerigo - yStartPerigo);
+
+                // Faixa de Muda (0.42 - 0.73)
+                const yStartMuda = y1.getPixelForValue(0.73);
+                const yEndMuda = y1.getPixelForValue(0.42);
+                ctx.fillStyle = 'rgba(255, 99, 132, 0.2)';
+                ctx.fillRect(left, yStartMuda, width, yEndMuda - yStartMuda);
+
+                // Faixa Vegetativa (0.64 - 1.06)
+                const yStartVege = y1.getPixelForValue(1.06);
+                const yEndVege = y1.getPixelForValue(0.64);
+                ctx.fillStyle = 'rgba(75, 192, 192, 0.2)';
+                ctx.fillRect(left, yStartVege, width, yEndVege - yStartVege);
+
+                // Faixa de Floração (0.95 - 1.37)
+                const yStartFlora = y1.getPixelForValue(1.37);
+                const yEndFlora = y1.getPixelForValue(0.95);
+                ctx.fillStyle = 'rgba(255, 205, 86, 0.2)';
+                ctx.fillRect(left, yStartFlora, width, yEndFlora - yStartFlora);
+
+                // Faixa de Perigo (> 1.38)
+                const yStartPerigoHigh = y1.getPixelForValue(y1.max);
+                const yEndPerigoHigh = y1.getPixelForValue(1.38);
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                ctx.fillRect(left, yStartPerigoHigh, width, yEndPerigoHigh - yStartPerigoHigh);
+                
+                ctx.restore();
+            }
+        };
+
+        // Função para calcular o VPD
+        function getVPD(T, RH) {
+            const SVP = 0.6108 * Math.exp((17.27 * T) / (T + 237.3));
+            const AVP = SVP * (RH / 100);
+            return SVP - AVP;
+        }
+
+        // Função para obter a classe de cor com base no VPD
+        function getColorClass(vpd) {
+            if (vpd >= 0.95 && vpd <= 1.37) {
+                return 'flora';
+            } else if (vpd >= 0.64 && vpd <= 1.06) {
+                return 'vege';
+            } else if (vpd >= 0.42 && vpd <= 0.73) {
+                return 'muda';
+            } else {
+                return 'out-of-range';
+            }
+        }
+
+        // Gera a tabela VPD
+        function generateVPDTable() {
+            vpdTableBody.innerHTML = '';
+            tempValues.forEach(T => {
+                const row = document.createElement('tr');
+                const tempCell = document.createElement('td');
+                tempCell.textContent = T;
+                tempCell.classList.add('font-semibold');
+                row.appendChild(tempCell);
+
+                humidityValues.forEach(RH => {
+                    const cell = document.createElement('td');
+                    const vpd = getVPD(T, RH);
+                    cell.textContent = vpd.toFixed(2);
+                    cell.classList.add(getColorClass(vpd));
+                    row.appendChild(cell);
+                });
+
+                vpdTableBody.appendChild(row);
+            });
+        }
+        
+        // Função principal de cálculo
+        function calculateVPD() {
+            const T_air = parseFloat(tempInput.value);
+            const RH = parseFloat(humidityInput.value);
+            const T_offset = parseFloat(tempOffsetInput.value) || 0;
+            const T_leaf = T_air + T_offset;
+
+            // Validação dos inputs
+            if (isNaN(T_air) || isNaN(RH) || RH < 0 || RH > 100) {
+                errorMsg.classList.remove('hidden');
+                resultContainer.classList.add('hidden');
+                return;
+            }
+
+            errorMsg.classList.add('hidden');
+
+            const vpd = getVPD(T_leaf, RH);
+            vpdValue.textContent = vpd.toFixed(2) + ' kPa';
+
+            // Remove todas as classes de cor e de destaque
+            resultContainer.classList.remove('bg-green-900', 'border-green-700', 'bg-red-900', 'border-red-700', 'bg-yellow-900', 'border-yellow-700');
+            vpdValue.classList.remove('text-green-400', 'text-red-400', 'text-yellow-400');
+            document.querySelectorAll('.vpd-table td').forEach(cell => cell.classList.remove('highlight'));
+
+            // Determina a fase de cultivo e aplica a cor correta ao resultado
+            let stageText = '';
+            if (vpd >= 0.42 && vpd <= 0.73) {
+                stageText = 'VPD ideal para a fase de Muda / Começo do Vegetativo.';
+                resultContainer.classList.add('bg-red-900', 'border-red-700');
+                vpdValue.classList.add('text-red-400');
+            } else if (vpd >= 0.64 && vpd <= 1.06) {
+                stageText = 'VPD ideal para a fase Final do Vegetativo / Começo da Floração.';
+                resultContainer.classList.add('bg-green-900', 'border-green-700');
+                vpdValue.classList.add('text-green-400');
+            } else if (vpd >= 0.95 && vpd <= 1.37) {
+                stageText = 'VPD ideal para a fase de Meio e Final da Floração.';
+                resultContainer.classList.add('bg-yellow-900', 'border-yellow-700');
+                vpdValue.classList.add('text-yellow-400');
+            } else {
+                stageText = 'VPD fora da faixa ideal. Considere ajustar a temperatura ou umidade.';
+                resultContainer.classList.add('bg-red-900', 'border-red-700');
+                vpdValue.classList.add('text-red-400');
+            }
+            vpdStage.textContent = stageText;
+            
+            resultContainer.classList.remove('hidden');
+
+            // Encontra e destaca a célula mais próxima na tabela
+            let closestT = tempValues.reduce((prev, curr) => (Math.abs(curr - T_air) < Math.abs(prev - T_air) ? curr : prev));
+            let closestRH = humidityValues.reduce((prev, curr) => (Math.abs(curr - RH) < Math.abs(prev - RH) ? curr : prev));
+            
+            let tempIndex = tempValues.indexOf(closestT);
+            let rhIndex = humidityValues.indexOf(closestRH);
+
+            if (tempIndex !== -1 && rhIndex !== -1) {
+                const row = vpdTableBody.children[tempIndex];
+                const cell = row.children[rhIndex + 1]; // +1 para pular a célula de temperatura
+                cell.classList.add('highlight');
+            }
+        }
+        
+        // Função para analisar e converter o formato de data
+        function parseDate(dateString) {
+            const [datePart, timePart] = dateString.split(' ');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hour, minute, second] = timePart.split(':').map(Number);
+            return new Date(year, month - 1, day, hour, minute, second);
+        }
+
+        // Função para carregar e processar um arquivo CSV com as duas colunas
+        function processCombinedFile(file) {
+            const tempOffset = parseFloat(tempOffsetInput.value) || 0;
+            return new Promise((resolve, reject) => {
+                Papa.parse(file, {
+                    header: true,
+                    dynamicTyping: true,
+                    complete: function(results) {
+                        const combinedData = [];
+                        const data = results.data;
+                        const tempKey = Object.keys(data[0]).find(k => k.toLowerCase().includes('temperatura'));
+                        const humidityKey = Object.keys(data[0]).find(k => k.toLowerCase().includes('humidade'));
+                        
+                        if (!tempKey || !humidityKey) {
+                            return reject('O arquivo não contém as colunas de temperatura e umidade.');
+                        }
+                        
+                        data.forEach(row => {
+                            const T_air = row[tempKey];
+                            const RH = row[humidityKey];
+                            const T_leaf = T_air + tempOffset;
+                            
+                            if (row.DateTime && !isNaN(T_air) && !isNaN(RH)) {
+                                combinedData.push({
+                                    time: parseDate(row.DateTime), // Usa a função de análise de data
+                                    temperature: T_air,
+                                    humidity: RH,
+                                    vpd: getVPD(T_leaf, RH)
+                                });
+                            }
+                        });
+                        if (combinedData.length === 0) {
+                             return reject('Nenhum dado válido encontrado para o gráfico. Verifique o formato dos arquivos.');
+                        }
+                        resolve(combinedData);
+                    },
+                    error: function() {
+                        reject('Erro ao processar o arquivo. Verifique o formato.');
+                    }
+                });
+            });
+        }
+
+        // Função para carregar e processar arquivos CSV separados
+        function processSeparateFiles(tempFileObj, humidityFileObj) {
+            const tempOffset = parseFloat(tempOffsetInput.value) || 0;
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const tempMap = await processFile(tempFileObj);
+                    const humidityMap = await processFile(humidityFileObj);
+
+                    const combinedData = [];
+                    const largerMap = Object.keys(tempMap).length > Object.keys(humidityMap).length ? tempMap : humidityMap;
+                    const smallerMap = largerMap === tempMap ? humidityMap : tempMap;
+
+                    for (const timestamp in largerMap) {
+                        if (smallerMap[timestamp] !== undefined) {
+                            const tempValue = tempMap[timestamp].isTemp ? tempMap[timestamp].value : humidityMap[timestamp].value;
+                            const humidityValue = humidityMap[timestamp].isHumidity ? humidityMap[timestamp].value : tempMap[timestamp].value;
+
+                            const T_air = parseFloat(tempValue);
+                            const RH = parseFloat(humidityValue);
+                            const T_leaf = T_air + tempOffset;
+
+                            if (!isNaN(T_air) && !isNaN(RH)) {
+                                combinedData.push({
+                                    time: parseDate(timestamp), // Usa a função de análise de data
+                                    temperature: T_air,
+                                    humidity: RH,
+                                    vpd: getVPD(T_leaf, RH)
+                                });
+                            }
+                        }
+                    }
+                    if (combinedData.length === 0) {
+                         return reject('Nenhum dado válido encontrado para o gráfico. Verifique o formato dos arquivos.');
+                    }
+                    resolve(combinedData);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        // Função para processar um único arquivo CSV para dados separados
+        function processFile(file) {
+            return new Promise((resolve, reject) => {
+                Papa.parse(file, {
+                    header: true,
+                    dynamicTyping: true,
+                    complete: function(results) {
+                        if (results.data.length === 0) {
+                            return reject('Arquivo vazio ou com formato incorreto.');
+                        }
+                        const data = {};
+                        results.data.forEach(row => {
+                            if (row.DateTime) {
+                                // Adiciona as chaves de temperatura e umidade com base no nome do arquivo
+                                const isTempFile = file.name.toLowerCase().includes('temperatura') || Object.keys(row).some(k => k.toLowerCase().includes('temperatura'));
+                                const isHumidityFile = file.name.toLowerCase().includes('umidade') || Object.keys(row).some(k => k.toLowerCase().includes('humidade'));
+                                
+                                const valueKey = isTempFile ? Object.keys(row).find(k => k.toLowerCase().includes('temperatura')) :
+                                               isHumidityFile ? Object.keys(row).find(k => k.toLowerCase().includes('humidade')) : null;
+
+                                if (valueKey) {
+                                    // Ignora linhas com valor '#'
+                                    if (row[valueKey] !== '#') {
+                                        data[row.DateTime.trim()] = {
+                                            isTemp: isTempFile,
+                                            isHumidity: isHumidityFile,
+                                            value: row[valueKey]
+                                        };
+                                    }
+                                }
+                            }
+                        });
+                        resolve(data);
+                    },
+                    error: function() {
+                        reject('Erro ao processar o arquivo. Verifique o formato.');
+                    }
+                });
+            });
+        }
+
+
+        // Função para renderizar o gráfico
+        function renderChart(data) {
+            const ctx = document.getElementById('vpd-chart').getContext('2d');
+            
+            const timestamps = data.map(d => d.time);
+            const temperatures = data.map(d => d.temperature);
+            const humidities = data.map(d => d.humidity);
+            const vpds = data.map(d => d.vpd);
+
+            if (vpdChart) {
+                vpdChart.destroy();
+            }
+
+            vpdChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [{
+                        label: 'Temperatura (°C)',
+                        data: temperatures,
+                        borderColor: '#f87171',
+                        backgroundColor: '#f87171',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Umidade (%)',
+                        data: humidities,
+                        borderColor: '#60a5fa',
+                        backgroundColor: '#60a5fa',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'VPD (kPa)',
+                        data: vpds,
+                        borderColor: '#4ade80',
+                        backgroundColor: '#4ade80',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'hour',
+                                tooltipFormat: 'dd/MM/yyyy HH:mm',
+                                displayFormats: {
+                                    'hour': 'HH:mm'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Tempo',
+                                color: '#e0e0e0'
+                            },
+                            ticks: {
+                                color: '#a0a0a0'
+                            },
+                            grid: {
+                                color: '#2d3436'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Temperatura (°C) / Umidade (%)',
+                                color: '#e0e0e0'
+                            },
+                            ticks: {
+                                color: '#a0a0a0'
+                            },
+                            grid: {
+                                color: '#2d3436'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            min: 0,
+                            max: 2.0,
+                            title: {
+                                display: true,
+                                text: 'VPD (kPa)',
+                                color: '#e0e0e0'
+                            },
+                            ticks: {
+                                color: '#a0a0a0'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e0e0e0'
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const date = new Date(tooltipItems[0].label);
+                                    // Usa toLocaleString para formatação localizada
+                                    return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'vpdRangesPlugin',
+                    beforeDraw: (chart) => {
+                        const { ctx, chartArea: { top, bottom, left, right, width }, scales: { y1 } } = chart;
+                        if (!y1) return;
+                        ctx.save();
+                        
+                        // Faixa de Perigo (0 a 0.41)
+                        const yStartPerigo = y1.getPixelForValue(0.41);
+                        const yEndPerigo = y1.getPixelForValue(0);
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                        ctx.fillRect(left, yStartPerigo, width, yEndPerigo - yStartPerigo);
+
+                        // Faixa de Muda (0.42 - 0.73)
+                        const yStartMuda = y1.getPixelForValue(0.73);
+                        const yEndMuda = y1.getPixelForValue(0.42);
+                        ctx.fillStyle = 'rgba(255, 99, 132, 0.2)';
+                        ctx.fillRect(left, yStartMuda, width, yEndMuda - yStartMuda);
+
+                        // Faixa Vegetativa (0.64 - 1.06)
+                        const yStartVege = y1.getPixelForValue(1.06);
+                        const yEndVege = y1.getPixelForValue(0.64);
+                        ctx.fillStyle = 'rgba(75, 192, 192, 0.2)';
+                        ctx.fillRect(left, yStartVege, width, yEndVege - yStartVege);
+
+                        // Faixa de Floração (0.95 - 1.37)
+                        const yStartFlora = y1.getPixelForValue(1.37);
+                        const yEndFlora = y1.getPixelForValue(0.95);
+                        ctx.fillStyle = 'rgba(255, 205, 86, 0.2)';
+                        ctx.fillRect(left, yStartFlora, width, yEndFlora - yStartFlora);
+
+                        // Faixa de Perigo (> 1.38)
+                        const yStartPerigoHigh = y1.getPixelForValue(y1.max);
+                        const yEndPerigoHigh = y1.getPixelForValue(1.38);
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                        ctx.fillRect(left, yStartPerigoHigh, width, yEndPerigoHigh - yStartPerigoHigh);
+                        
+                        ctx.restore();
+                    }
+                }]
+            });
+        }
+        
+        // Listeners
+        calculateBtn.addEventListener('click', calculateVPD);
+        tempInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                calculateVPD();
+            }
+        });
+        humidityInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                calculateVPD();
+            }
+        });
+        
+        processFilesBtn.addEventListener('click', async () => {
+            const tempFileObj = tempFile.files[0];
+            const humidityFileObj = humidityFile.files[0];
+            const combinedFileObj = combinedFile.files[0];
+
+            loadingIndicator.classList.remove('hidden');
+            chartError.classList.add('hidden');
+            
+            try {
+                let chartData;
+                if (combinedFileObj) {
+                    // Opção 1: Processar arquivo único
+                    chartData = await processCombinedFile(combinedFileObj);
+                } else if (tempFileObj && humidityFileObj) {
+                    // Opção 2: Processar arquivos separados
+                    chartData = await processSeparateFiles(tempFileObj, humidityFileObj);
+                } else {
+                    chartError.textContent = 'Por favor, carregue os arquivos de acordo com uma das opções.';
+                    chartError.classList.remove('hidden');
+                    return;
+                }
+                
+                if (chartData.length === 0) {
+                    chartError.textContent = 'Nenhum dado válido encontrado para o gráfico. Verifique o formato dos arquivos.';
+                    chartError.classList.remove('hidden');
+                } else {
+                    renderChart(chartData);
+                }
+            } catch (error) {
+                chartError.textContent = error;
+                chartError.classList.remove('hidden');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+
+        // Gera a tabela inicial ao carregar a página
+        window.onload = generateVPDTable;
+    </script>
+</body>
+</html>
