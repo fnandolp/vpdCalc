@@ -379,7 +379,6 @@
             const T_air = parseFloat(tempInput.value);
             const RH = parseFloat(humidityInput.value);
             const T_offset = parseFloat(tempOffsetCalculator.value) || 0;
-            const T_leaf = T_air + T_offset;
 
             // Validação dos inputs
             if (isNaN(T_air) || isNaN(RH) || RH < 0 || RH > 100) {
@@ -391,7 +390,9 @@
 
             errorMsg.classList.add('hidden');
 
+            const T_leaf = T_air + T_offset;
             const vpd = getVPD(T_leaf, RH);
+            
             vpdValue.textContent = vpd.toFixed(2) + ' kPa';
 
             // Remove todas as classes de cor e de destaque
@@ -425,7 +426,7 @@
             resultContent.classList.remove('hidden');
 
             // Encontra e destaca a célula mais próxima na tabela
-            let closestT = tempValues.reduce((prev, curr) => (Math.abs(curr - T_air) < Math.abs(prev - T_air) ? curr : prev));
+            let closestT = tempValues.reduce((prev, curr) => (Math.abs(curr - T_leaf) < Math.abs(prev - T_leaf) ? curr : prev));
             let closestRH = humidityValues.reduce((prev, curr) => (Math.abs(curr - RH) < Math.abs(prev - RH) ? curr : prev));
             
             let tempIndex = tempValues.indexOf(closestT);
@@ -803,4 +804,3 @@
     </script>
 </body>
 </html>
-
