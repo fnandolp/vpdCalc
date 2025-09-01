@@ -58,11 +58,10 @@
             background-color: #1f1f1f;
         }
         .vpd-table td.highlight {
-            border: 3px solid #6ee7b7;
-            box-shadow: 0 0 15px #6ee7b7;
-            transform: scale(1.05);
-            position: relative;
-            z-index: 10;
+            background-color: #6ee7b7;
+            color: #1a1a2e;
+            font-weight: bold;
+            box-shadow: 0 0 10px #6ee7b7;
         }
         .legend-item {
             display: flex;
@@ -79,145 +78,197 @@
             height: 32px;
             animation: spin 1s linear infinite;
         }
+        .tab-button {
+            padding: 12px 24px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #a0a0a0;
+            border-radius: 12px 12px 0 0;
+            border: none;
+            background-color: #1a1a2e;
+        }
+        .tab-button.active {
+            color: #e0e0e0;
+            background-color: #2c412f;
+        }
+        .tab-content {
+            padding: 16px;
+            background-image: linear-gradient(to bottom right, #2c412f, #1a2a1a);
+            border-radius: 0 12px 12px 12px;
+            border-top: none;
+        }
     </style>
 </head>
 <body class="p-4 flex flex-col items-center justify-center min-h-screen">
 
-    <div class="container mx-auto p-6 rounded-3xl shadow-2xl gradient-bg border border-green-700">
-        <h1 class="text-3xl font-bold text-center mb-4 text-white">Calculadora de VPD</h1>
-        <p class="text-center mb-6 text-gray-300">Calcule o VPD para otimizar o ambiente do seu cultivo.</p>
+    <div class="container mx-auto p-0 rounded-3xl shadow-2xl bg-gray-900 border border-green-700">
+        <!-- Abas -->
+        <div class="flex">
+            <button id="tab-calculator" class="tab-button active">Calculadora</button>
+            <button id="tab-analysis" class="tab-button">Análise de Dados</button>
+        </div>
 
-        <!-- Seção de Inputs -->
-        <div class="space-y-4 mb-8">
-            <div>
-                <label for="temperature" class="block text-sm font-medium mb-1 text-gray-300">Temperatura do Ar (°C)</label>
-                <input type="number" id="temperature" placeholder="Ex: 25" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+        <!-- Conteúdo das Abas -->
+        <div id="tab-content-calculator" class="tab-content">
+            <h1 class="text-3xl font-bold text-center mb-4 text-white">Calculadora de VPD</h1>
+            <p class="text-center mb-6 text-gray-300">Calcule o VPD para otimizar o ambiente do seu cultivo.</p>
+
+            <!-- Seção de Inputs -->
+            <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-8">
+                <!-- Inputs de Temperatura e Umidade -->
+                <div class="space-y-4 flex-1">
+                    <div>
+                        <label for="temperature" class="block text-sm font-medium mb-1 text-gray-300">Temperatura do Ar (°C)</label>
+                        <input type="number" id="temperature" placeholder="Ex: 25" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+                    </div>
+                    <div>
+                        <label for="humidity" class="block text-sm font-medium mb-1 text-gray-300">Umidade Relativa (%)</label>
+                        <input type="number" id="humidity" placeholder="Ex: 60" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+                    </div>
+                    <div>
+                        <label for="temp-offset" class="block text-sm font-medium mb-1 text-gray-300">Diferença de Temperatura da Folha (°C)</label>
+                        <input type="number" id="temp-offset" placeholder="Ex: -2.5" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+                    </div>
+                     <!-- Botão de Calcular -->
+                    <button id="calculateBtn" class="w-full p-3 text-lg font-semibold rounded-lg text-gray-900 shadow-md btn transition-all duration-300 ease-in-out">
+                        Calcular VPD
+                    </button>
+                </div>
+
+                <!-- Seção de Resultados (agora ao lado dos inputs) -->
+                <div id="result-container" class="mt-4 md:mt-0 p-5 rounded-xl border border-green-600 bg-green-900 bg-opacity-20 text-center flex-1 transition-opacity duration-300">
+                    <div id="initial-message" class="text-gray-400 flex flex-col items-center justify-center">
+                        <!-- Ícone de folha de cannabis (SVG) -->
+                        <img src="icon.png" alt="Ícone de folha de cannabis" class="w-12 h-12 mb-2">
+                        <p class="text-sm">Insira seus dados para calcular o VPD.</p>
+                    </div>
+                    <div id="result-content" class="hidden">
+                        <h2 class="text-xl font-bold text-white mb-2">Seu VPD é:</h2>
+                        <p id="vpd-value" class="text-5xl font-extrabold text-green-400 tracking-wide"></p>
+                        <p id="vpd-stage" class="text-sm mt-3 text-gray-300"></p>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label for="humidity" class="block text-sm font-medium mb-1 text-gray-300">Umidade Relativa (%)</label>
-                <input type="number" id="humidity" placeholder="Ex: 60" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+
+            <!-- Mensagem de erro -->
+            <div id="error-message" class="mt-4 p-4 rounded-lg bg-red-900 bg-opacity-20 text-red-300 border border-red-700 hidden">
+                Por favor, insira valores válidos de temperatura e umidade.
             </div>
-            <div>
-                <label for="temp-offset" class="block text-sm font-medium mb-1 text-gray-300">Diferença de Temperatura da Folha (°C)</label>
-                <input type="number" id="temp-offset" placeholder="Ex: -2.5" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+
+            <!-- Tabela de VPD -->
+            <div class="container mx-auto mt-8 p-6 rounded-3xl shadow-2xl bg-gray-900 border border-gray-700">
+                <h2 class="text-2xl font-bold text-center mb-4 text-white">Tabela de VPD Ideal</h2>
+                <div class="overflow-x-auto relative rounded-lg">
+                    <table class="w-full vpd-table">
+                        <thead>
+                            <tr>
+                                <th class="px-2 py-2">Temp (°C)</th>
+                                <th class="px-2 py-2">35%</th>
+                                <th class="px-2 py-2">40%</th>
+                                <th class="px-2 py-2">45%</th>
+                                <th class="px-2 py-2">50%</th>
+                                <th class="px-2 py-2">55%</th>
+                                <th class="px-2 py-2">60%</th>
+                                <th class="px-2 py-2">65%</th>
+                                <th class="px-2 py-2">70%</th>
+                                <th class="px-2 py-2">75%</th>
+                                <th class="px-2 py-2">80%</th>
+                                <th class="px-2 py-2">85%</th>
+                                <th class="px-2 py-2">90%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vpd-table-body">
+                            <!-- Tabela gerada dinamicamente pelo JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex flex-col md:flex-row justify-center space-y-2 md:space-y-0 md:space-x-4 mt-6 text-sm">
+                    <div class="legend-item"><span class="w-4 h-4 rounded-full bg-red-900 border border-red-700 mr-2"></span><p>Fase de Muda / Começo do Vegetativo</p></div>
+                    <div class="legend-item"><span class="w-4 h-4 rounded-full bg-green-900 border border-green-700 mr-2"></span><p>Final do Vegetativo / Começo da Floração</p></div>
+                    <div class="legend-item"><span class="w-4 h-4 rounded-full bg-yellow-900 border border-yellow-700 mr-2"></span><p>Meio e Final da Floração</p></div>
+                </div>
             </div>
         </div>
 
-        <!-- Botão de Calcular -->
-        <button id="calculateBtn" class="w-full p-3 text-lg font-semibold rounded-lg text-gray-900 shadow-md btn transition-all duration-300 ease-in-out">
-            Calcular VPD
-        </button>
-
-        <!-- Seção de Resultados -->
-        <div id="result-container" class="mt-8 p-5 rounded-xl border border-green-600 bg-green-900 bg-opacity-20 text-center hidden">
-            <h2 class="text-xl font-bold text-white mb-2">Seu VPD é:</h2>
-            <p id="vpd-value" class="text-5xl font-extrabold text-green-400 tracking-wide"></p>
-            <p id="vpd-stage" class="text-sm mt-3 text-gray-300"></p>
-        </div>
-
-        <!-- Mensagem de erro -->
-        <div id="error-message" class="mt-4 p-4 rounded-lg bg-red-900 bg-opacity-20 text-red-300 border border-red-700 hidden">
-            Por favor, insira valores válidos de temperatura e umidade.
-        </div>
-    </div>
-    
-    <!-- Tabela de VPD -->
-    <div class="container mx-auto mt-8 p-6 rounded-3xl shadow-2xl bg-gray-900 border border-gray-700">
-        <h2 class="text-2xl font-bold text-center mb-4 text-white">Tabela de VPD Ideal</h2>
-        <div class="overflow-x-auto relative rounded-lg">
-            <table class="w-full vpd-table">
-                <thead>
-                    <tr>
-                        <th class="px-2 py-2">Temp (°C)</th>
-                        <th class="px-2 py-2">50%</th>
-                        <th class="px-2 py-2">55%</th>
-                        <th class="px-2 py-2">60%</th>
-                        <th class="px-2 py-2">65%</th>
-                        <th class="px-2 py-2">70%</th>
-                        <th class="px-2 py-2">75%</th>
-                        <th class="px-2 py-2">80%</th>
-                    </tr>
-                </thead>
-                <tbody id="vpd-table-body">
-                    <!-- Tabela gerada dinamicamente pelo JS -->
-                </tbody>
-            </table>
-        </div>
-        <div class="flex flex-col md:flex-row justify-center space-y-2 md:space-y-0 md:space-x-4 mt-6 text-sm">
-            <div class="legend-item"><span class="w-4 h-4 rounded-full bg-red-900 border border-red-700 mr-2"></span><p>Fase de Muda / Começo do Vegetativo</p></div>
-            <div class="legend-item"><span class="w-4 h-4 rounded-full bg-green-900 border border-green-700 mr-2"></span><p>Final do Vegetativo / Começo da Floração</p></div>
-            <div class="legend-item"><span class="w-4 h-4 rounded-full bg-yellow-900 border border-yellow-700 mr-2"></span><p>Meio e Final da Floração</p></div>
-        </div>
-    </div>
-
-    <!-- Seção de Upload de Dados do Sensor e Gráfico -->
-    <div class="container mx-auto mt-8 p-6 rounded-3xl shadow-2xl bg-gray-900 border border-gray-700">
-        <h2 class="text-2xl font-bold text-center mb-4 text-white">Análise de Dados do Sensor</h2>
-        <p class="text-sm text-gray-400 text-center mb-4">Carregue os arquivos CSV com os dados do seu sensor para visualizar a evolução do VPD ao longo do tempo.</p>
+        <div id="tab-content-analysis" class="tab-content hidden">
+            <!-- Seção de Upload de Dados do Sensor e Gráfico -->
+            <div class="container mx-auto p-6 rounded-3xl shadow-2xl bg-gray-900 border border-gray-700">
+                <h2 class="text-2xl font-bold text-center mb-4 text-white">Análise de Dados do Sensor</h2>
+                <p class="text-sm text-gray-400 text-center mb-4">Carregue os arquivos CSV com os dados do seu sensor para visualizar a evolução do VPD ao longo do tempo.</p>
+                
+                <div>
+                    <label for="temp-offset-analysis" class="block text-sm font-medium mb-1 text-gray-300">Diferença de Temperatura da Folha (°C)</label>
+                    <input type="number" id="temp-offset-analysis" placeholder="Ex: -2.5" class="w-full p-3 rounded-lg input-field focus:outline-none focus:ring-2 focus:ring-green-400 transition">
+                </div>
+                
+                <div class="my-4">
+                    <label for="combined-file" class="block text-sm font-medium mb-1 text-gray-300">Opção 1: Arquivo CSV Combinado</label>
+                    <input type="file" id="combined-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border border-gray-700">
+                </div>
+                
+                <p class="text-center text-gray-400 mb-4">OU</p>
+                
+                <div class="mb-4">
+                    <label for="temp-file" class="block text-sm font-medium mb-1 text-gray-300">Opção 2: Arquivo de Temperatura</label>
+                    <input type="file" id="temp-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border border-gray-700">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="humidity-file" class="block text-sm font-medium mb-1 text-gray-300">Arquivo de Umidade</label>
+                    <input type="file" id="humidity-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border a.700">
+                </div>
         
-        <div class="mb-4">
-            <label for="combined-file" class="block text-sm font-medium mb-1 text-gray-300">Opção 1: Arquivo CSV Combinado</label>
-            <input type="file" id="combined-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border border-gray-700">
-        </div>
+                <button id="processFilesBtn" class="w-full p-3 text-lg font-semibold rounded-lg text-gray-900 shadow-md btn transition-all duration-300 ease-in-out">
+                    Processar e Gerar Gráfico
+                </button>
         
-        <p class="text-center text-gray-400 mb-4">OU</p>
+                <div id="chart-container" class="relative mt-4" style="height: 400px;">
+                    <canvas id="vpd-chart"></canvas>
+                    <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 rounded-lg hidden">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
         
-        <div class="mb-4">
-            <label for="temp-file" class="block text-sm font-medium mb-1 text-gray-300">Opção 2: Arquivo de Temperatura</label>
-            <input type="file" id="temp-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border border-gray-700">
-        </div>
+                <!-- Nova legenda para as faixas de VPD -->
+                <div id="vpd-legend" class="flex flex-wrap justify-center space-x-4 mt-6 text-sm">
+                    <div class="flex items-center space-x-2 my-1">
+                        <div class="w-4 h-4 rounded-full bg-red-900 border border-red-700"></div>
+                        <span>Perigo (0 - 0.41 kPa)</span>
+                    </div>
+                    <div class="flex items-center space-x-2 my-1">
+                        <div class="w-4 h-4 rounded-full bg-red-500 border border-red-700"></div>
+                        <span>Muda / Vegetativo (0.42 - 0.73 kPa)</span>
+                    </div>
+                    <div class="flex items-center space-x-2 my-1">
+                        <div class="w-4 h-4 rounded-full bg-green-500 border border-green-700"></div>
+                        <span>Vegetativo / Floração (0.64 - 1.06 kPa)</span>
+                    </div>
+                    <div class="flex items-center space-x-2 my-1">
+                        <div class="w-4 h-4 rounded-full bg-yellow-500 border border-yellow-700"></div>
+                        <span>Meio / Final Floração (0.95 - 1.37 kPa)</span>
+                    </div>
+                    <div class="flex items-center space-x-2 my-1">
+                        <div class="w-4 h-4 rounded-full bg-red-900 border border-red-700"></div>
+                        <span>Perigo (> 1.38 kPa)</span>
+                    </div>
+                </div>
         
-        <div class="mb-4">
-            <label for="humidity-file" class="block text-sm font-medium mb-1 text-gray-300">Arquivo de Umidade</label>
-            <input type="file" id="humidity-file" accept=".csv" class="w-full text-gray-300 bg-gray-800 p-2 rounded-lg border a.700">
-        </div>
-
-        <button id="processFilesBtn" class="w-full p-3 text-lg font-semibold rounded-lg text-gray-900 shadow-md btn transition-all duration-300 ease-in-out">
-            Processar e Gerar Gráfico
-        </button>
-
-        <div id="chart-container" class="relative mt-4" style="height: 400px;">
-            <canvas id="vpd-chart"></canvas>
-            <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 rounded-lg hidden">
-                <div class="spinner"></div>
+                <p id="chart-error" class="mt-4 text-center text-red-400 hidden"></p>
             </div>
         </div>
-
-        <!-- Nova legenda para as faixas de VPD -->
-        <div id="vpd-legend" class="flex flex-wrap justify-center space-x-4 mt-6 text-sm">
-            <div class="flex items-center space-x-2 my-1">
-                <div class="w-4 h-4 rounded-full bg-red-900 border border-red-700"></div>
-                <span>Perigo (0 - 0.41 kPa)</span>
-            </div>
-            <div class="flex items-center space-x-2 my-1">
-                <div class="w-4 h-4 rounded-full bg-red-500 border border-red-700"></div>
-                <span>Muda / Vegetativo (0.42 - 0.73 kPa)</span>
-            </div>
-            <div class="flex items-center space-x-2 my-1">
-                <div class="w-4 h-4 rounded-full bg-green-500 border border-green-700"></div>
-                <span>Vegetativo / Floração (0.64 - 1.06 kPa)</span>
-            </div>
-            <div class="flex items-center space-x-2 my-1">
-                <div class="w-4 h-4 rounded-full bg-yellow-500 border border-yellow-700"></div>
-                <span>Meio / Final Floração (0.95 - 1.37 kPa)</span>
-            </div>
-            <div class="flex items-center space-x-2 my-1">
-                <div class="w-4 h-4 rounded-full bg-red-900 border border-red-700"></div>
-                <span>Perigo (> 1.38 kPa)</span>
-            </div>
-        </div>
-
-        <p id="chart-error" class="mt-4 text-center text-red-400 hidden"></p>
     </div>
 
     <script>
         const calculateBtn = document.getElementById('calculateBtn');
         const tempInput = document.getElementById('temperature');
         const humidityInput = document.getElementById('humidity');
-        const tempOffsetInput = document.getElementById('temp-offset');
+        const tempOffsetCalculator = document.getElementById('temp-offset');
+        const tempOffsetAnalysis = document.getElementById('temp-offset-analysis');
         const vpdValue = document.getElementById('vpd-value');
         const vpdStage = document.getElementById('vpd-stage');
         const resultContainer = document.getElementById('result-container');
+        const resultContent = document.getElementById('result-content');
+        const initialMessage = document.getElementById('initial-message');
         const errorMsg = document.getElementById('error-message');
         const vpdTableBody = document.getElementById('vpd-table-body');
         const tempFile = document.getElementById('temp-file');
@@ -227,8 +278,13 @@
         const chartError = document.getElementById('chart-error');
         const loadingIndicator = document.getElementById('loading-indicator');
 
-        const tempValues = [20, 22, 24, 26, 28, 30, 32];
-        const humidityValues = [50, 55, 60, 65, 70, 75, 80];
+        const tabCalculatorBtn = document.getElementById('tab-calculator');
+        const tabAnalysisBtn = document.getElementById('tab-analysis');
+        const tabCalculatorContent = document.getElementById('tab-content-calculator');
+        const tabAnalysisContent = document.getElementById('tab-content-analysis');
+
+        const tempValues = [15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
+        const humidityValues = [35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
 
         let vpdChart = null;
         
@@ -320,13 +376,14 @@
         function calculateVPD() {
             const T_air = parseFloat(tempInput.value);
             const RH = parseFloat(humidityInput.value);
-            const T_offset = parseFloat(tempOffsetInput.value) || 0;
+            const T_offset = parseFloat(tempOffsetCalculator.value) || 0;
             const T_leaf = T_air + T_offset;
 
             // Validação dos inputs
             if (isNaN(T_air) || isNaN(RH) || RH < 0 || RH > 100) {
                 errorMsg.classList.remove('hidden');
-                resultContainer.classList.add('hidden');
+                initialMessage.classList.add('hidden');
+                resultContent.classList.add('hidden');
                 return;
             }
 
@@ -361,7 +418,9 @@
             }
             vpdStage.textContent = stageText;
             
-            resultContainer.classList.remove('hidden');
+            // Show result content and hide initial message
+            initialMessage.classList.add('hidden');
+            resultContent.classList.remove('hidden');
 
             // Encontra e destaca a célula mais próxima na tabela
             let closestT = tempValues.reduce((prev, curr) => (Math.abs(curr - T_air) < Math.abs(prev - T_air) ? curr : prev));
@@ -387,7 +446,7 @@
 
         // Função para carregar e processar um arquivo CSV com as duas colunas
         function processCombinedFile(file) {
-            const tempOffset = parseFloat(tempOffsetInput.value) || 0;
+            const tempOffset = parseFloat(tempOffsetAnalysis.value) || 0;
             return new Promise((resolve, reject) => {
                 Papa.parse(file, {
                     header: true,
@@ -430,7 +489,7 @@
 
         // Função para carregar e processar arquivos CSV separados
         function processSeparateFiles(tempFileObj, humidityFileObj) {
-            const tempOffset = parseFloat(tempOffsetInput.value) || 0;
+            const tempOffset = parseFloat(tempOffsetAnalysis.value) || 0;
             return new Promise(async (resolve, reject) => {
                 try {
                     const tempMap = await processFile(tempFileObj);
@@ -720,6 +779,20 @@
             } finally {
                 loadingIndicator.classList.add('hidden');
             }
+        });
+        
+        tabCalculatorBtn.addEventListener('click', () => {
+            tabCalculatorBtn.classList.add('active');
+            tabAnalysisBtn.classList.remove('active');
+            tabCalculatorContent.classList.remove('hidden');
+            tabAnalysisContent.classList.add('hidden');
+        });
+        
+        tabAnalysisBtn.addEventListener('click', () => {
+            tabAnalysisBtn.classList.add('active');
+            tabCalculatorBtn.classList.remove('active');
+            tabAnalysisContent.classList.remove('hidden');
+            tabCalculatorContent.classList.add('hidden');
         });
 
 
